@@ -1,3 +1,8 @@
+# Local-only stuff (not shared on GitHub)
+.idea
+parent-project/
+sample-logs/
+
 target/
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/

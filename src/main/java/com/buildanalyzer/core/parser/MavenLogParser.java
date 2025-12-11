@@ -1,4 +1,7 @@
-package com.buildanalyzer.core;
+package com.buildanalyzer.core.parser;
+
+import com.buildanalyzer.core.model.BuildSummary;
+import com.buildanalyzer.core.model.ModuleSummary;
 
 import java.io.IOException;
 import java.nio.file.Files;

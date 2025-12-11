@@ -1,5 +1,8 @@
-package com.buildanalyzer.core;
+package com.buildanalyzer.cli;
 
+import com.buildanalyzer.core.model.BuildSummary;
+import com.buildanalyzer.core.model.ModuleSummary;
+import com.buildanalyzer.core.parser.MavenLogParser;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
@@ -10,6 +13,9 @@ import java.nio.file.Paths;
 import java.util.Comparator;
 import java.util.function.Consumer;
 
+/**
+ * @author lhjls
+ */
 public class BuildAnalyzerCli {
 
     public static void main(String[] args) {

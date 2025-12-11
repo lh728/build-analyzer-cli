@@ -1,4 +1,4 @@
-package com.buildanalyzer.core;
+package com.buildanalyzer.cli;
 
 /**
  * Parsed command-line options for the Build Analyzer CLI.

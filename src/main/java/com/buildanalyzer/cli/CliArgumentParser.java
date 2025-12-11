@@ -1,4 +1,4 @@
-package com.buildanalyzer.core;
+package com.buildanalyzer.cli;
 
 import java.util.Locale;
 

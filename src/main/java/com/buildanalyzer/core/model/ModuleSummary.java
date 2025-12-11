@@ -1,4 +1,4 @@
-package com.buildanalyzer.core;
+package com.buildanalyzer.core.model;
 
 /**
  * Single Module Build Summary

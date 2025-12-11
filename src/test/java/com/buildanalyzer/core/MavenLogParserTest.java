@@ -1,5 +1,8 @@
 package com.buildanalyzer.core;
 
+import com.buildanalyzer.core.model.BuildSummary;
+import com.buildanalyzer.core.model.ModuleSummary;
+import com.buildanalyzer.core.parser.MavenLogParser;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;

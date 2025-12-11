@@ -69,7 +69,7 @@ This produces a jar under `target/`.
 
 ```bash
 # From project root (log path is just an example)
-java -cp target/classes com.buildanalyzer.core.BuildAnalyzerCli sample-logs/build-parent.log
+java -cp target/classes com.buildanalyzer.cli.BuildAnalyzerCli sample-logs/build-parent.log
 ```
 
 Example output (based on a 4-module Maven Reactor build):
@@ -97,11 +97,11 @@ Use `-j/--json` to get machine-readable output, and `-p/--pretty` to format it:
 
 ```bash
 # compact JSON
-java -cp target/classes com.buildanalyzer.core.BuildAnalyzerCli \
+java -cp target/classes com.buildanalyzer.cli.BuildAnalyzerCli \
   -j sample-logs/build-parent.log
 
 # pretty-printed JSON
-java -cp target/classes com.buildanalyzer.core.BuildAnalyzerCli \
+java -cp target/classes com.buildanalyzer.cli.BuildAnalyzerCli \
   -jp sample-logs/build-parent.log
 ```
 

@@ -1,5 +1,6 @@
 package com.buildanalyzer.core;
 
+import com.buildanalyzer.cli.BuildAnalyzerCli;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
@@ -11,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class BuildAnalyzerCliTest {
 
     @Test
-    void main_shouldPrintHumanReadableSummary_inTextMode() throws Exception {
+    void main_shouldPrintHumanReadableSummary_inTextMode() {
         String[] args = {"sample-logs/build-parent.log"};
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -37,7 +38,7 @@ class BuildAnalyzerCliTest {
     }
 
     @Test
-    void main_shouldPrintJsonSummary_whenJsonPrettyEnabled() throws Exception {
+    void main_shouldPrintJsonSummary_whenJsonPrettyEnabled() {
         String[] args = {"-jp", "sample-logs/build-parent.log"};
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();

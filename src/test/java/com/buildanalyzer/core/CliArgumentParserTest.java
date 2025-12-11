@@ -1,5 +1,7 @@
 package com.buildanalyzer.core;
 
+import com.buildanalyzer.cli.CliArgumentParser;
+import com.buildanalyzer.cli.CliOptions;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;

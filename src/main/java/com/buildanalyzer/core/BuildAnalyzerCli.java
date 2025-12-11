@@ -3,24 +3,42 @@ package com.buildanalyzer.core;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Comparator;
 import java.util.function.Consumer;
 
-/**
- * @author lhjls
- */
 public class BuildAnalyzerCli {
 
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args) {
+        try {
+            run(args);
+        } catch (IllegalStateException e) {
+            // business exception（ex. Total time / Reactor Summary）
+            System.err.println("ERROR: " + e.getMessage());
+            System.exit(3);
+        } catch (IOException e) {
+            // IO
+            System.err.println("ERROR: Failed to read log file: " + e.getMessage());
+            System.exit(4);
+        } catch (Exception e) {
+            // unexpected exception
+            System.err.println("Unexpected error: " + e.getClass().getSimpleName()
+                    + ": " + (e.getMessage() == null ? "" : e.getMessage()));
+            e.printStackTrace(System.err);
+            System.exit(99);
+        }
+    }
+
+    private static void run(String[] args) throws Exception {
         CliOptions options = CliArgumentParser.parse(args);
 
         Path logPath = Paths.get(options.logFile());
 
         if (!Files.exists(logPath)) {
-            System.err.println("File not found: " + logPath.toAbsolutePath());
+            System.err.println("ERROR: File not found: " + logPath.toAbsolutePath());
             System.exit(2);
         }
 
@@ -34,12 +52,16 @@ public class BuildAnalyzerCli {
         }
     }
 
+    // ---------- JSON output ----------
+
     private static void printJson(BuildSummary summary, boolean pretty) {
         Gson gson = pretty
                 ? new GsonBuilder().setPrettyPrinting().create()
                 : new Gson();
         System.out.println(gson.toJson(summary));
     }
+
+    // ---------- Text output ----------
 
     private static void printSummary(Path logPath, BuildSummary summary) {
         double totalBuild = summary.getTotalSeconds();
@@ -62,7 +84,8 @@ public class BuildAnalyzerCli {
 
         System.out.println("Modules by time (share of whole build):");
 
-        // Print the list of modules in descending order of time taken, with each module still listed as a percentage of the total build time.
+        // Print the list of modules in descending order of time taken,
+        // each module still listed as a percentage of the total build time.
         summary.getModules().stream()
                 .sorted(Comparator.comparingDouble(ModuleSummary::getSeconds).reversed())
                 .forEachOrdered(new Consumer<>() {
@@ -85,14 +108,12 @@ public class BuildAnalyzerCli {
         System.out.println();
 
         // slowest module
-        ModuleSummary slowest = summary.getModules().stream()
+        summary.getModules().stream()
                 .max(Comparator.comparingDouble(ModuleSummary::getSeconds))
-                .orElse(null);
-
-        if (slowest != null) {
-            double percentOfBuild = slowest.getSeconds() / totalBuild * 100.0;
-            System.out.printf("Slowest module: %s (%.3f s, %.1f%% of build)%n",
-                    slowest.getName(), slowest.getSeconds(), percentOfBuild);
-        }
+                .ifPresent(slowest -> {
+                    double percentOfBuild = slowest.getSeconds() / totalBuild * 100.0;
+                    System.out.printf("Slowest module: %s (%.3f s, %.1f%% of build)%n",
+                            slowest.getName(), slowest.getSeconds(), percentOfBuild);
+                });
     }
 }

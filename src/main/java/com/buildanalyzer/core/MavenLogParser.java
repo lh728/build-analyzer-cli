@@ -32,7 +32,6 @@ public class MavenLogParser {
      * parse total time from the log
      */
     double parseTotalTime(List<String> lines) {
-        // from back to front
         for (int i = lines.size() - 1; i >= 0; i--) {
             String line = lines.get(i);
             if (line.contains("Total time:")) {
@@ -40,7 +39,6 @@ public class MavenLogParser {
                 if (m.find()) {
                     double value = Double.parseDouble(m.group(1));
                     String unit = m.group(2).toLowerCase();
-
                     return switch (unit) {
                         case "s", "sec", "secs", "second", "seconds" -> value;
                         case "ms" -> value / 1000.0;
@@ -50,7 +48,9 @@ public class MavenLogParser {
                 }
             }
         }
-        throw new IllegalStateException("Could not find 'Total time' in log");
+        throw new IllegalStateException(
+                "Could not find 'Total time' line in the log. " +
+                        "Is this a Maven build log with INFO-level output?");
     }
 
     /**
@@ -58,7 +58,6 @@ public class MavenLogParser {
      */
     List<ModuleSummary> parseReactorSummary(List<String> lines) {
         List<ModuleSummary> modules = new ArrayList<>();
-
         boolean inSummary = false;
 
         for (String line : lines) {
@@ -70,15 +69,8 @@ public class MavenLogParser {
             }
 
             if (line.contains("BUILD SUCCESS")
-                    || line.contains("BUILD FAILURE")
-                    || line.contains("------------------------------------------------------------------------")) {
-                // Marker lines are usually at the beginning and end of the summary; can exit when encounter the second dividing line.
-                if (!modules.isEmpty()) {
-                    break;
-                } else {
-                    // The first dotted line (below the title) can be skipped.
-                    continue;
-                }
+                    || line.contains("BUILD FAILURE")) {
+                break;
             }
 
             Matcher m = MODULE_LINE_PATTERN.matcher(line);
@@ -90,7 +82,10 @@ public class MavenLogParser {
         }
 
         if (modules.isEmpty()) {
-            throw new IllegalStateException("Could not find 'Reactor Summary' modules in log");
+            throw new IllegalStateException(
+                    "Could not find any modules in 'Reactor Summary'. " +
+                            "Multi-module Maven builds usually print it as '[INFO] Reactor Summary ...'. " +
+                            "For single-module builds, the Reactor Summary section may be missing.");
         }
 
         return modules;

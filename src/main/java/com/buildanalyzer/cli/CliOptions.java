@@ -6,6 +6,8 @@ package com.buildanalyzer.cli;
 public record CliOptions(
         boolean jsonOutput,
         boolean prettyJson,
-        String logFile
-) {
-}
+        Mode mode,
+        String logFile,          // for SINGLE_LOG
+        String directory,        // for DIRECTORY
+        String aggregatePattern  // for PATTERN
+) {}

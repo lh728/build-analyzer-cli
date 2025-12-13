@@ -41,6 +41,16 @@ public class BuildAnalyzerCli {
     private static void run(String[] args) throws Exception {
         CliOptions options = CliArgumentParser.parse(args);
 
+        switch (options.mode()) {
+            case SINGLE_LOG -> runSingleLog(options);
+            case DIRECTORY -> runDirectoryAggregation(options);
+            case PATTERN -> runPatternAggregation(options);
+        }
+    }
+
+    // ---------- Mode handlers ----------
+
+    private static void runSingleLog(CliOptions options) throws Exception {
         Path logPath = Paths.get(options.logFile());
 
         if (!Files.exists(logPath)) {
@@ -56,6 +66,24 @@ public class BuildAnalyzerCli {
         } else {
             printSummary(logPath, summary);
         }
+    }
+
+    /**
+     * TODO: Directory aggregation mode.
+     * For now, just a placeholder.
+     */
+    private static void runDirectoryAggregation(CliOptions options) {
+        System.err.println("ERROR: Directory aggregation mode (--dir/-d) is not implemented yet.");
+        System.exit(5);
+    }
+
+    /**
+     * TODO: Glob pattern aggregation mode.
+     * For now, just a placeholder.
+     */
+    private static void runPatternAggregation(CliOptions options) {
+        System.err.println("ERROR: Pattern aggregation mode (--aggregate/-a) is not implemented yet.");
+        System.exit(6);
     }
 
     // ---------- JSON output ----------
@@ -74,14 +102,12 @@ public class BuildAnalyzerCli {
         double totalModules = summary.getModules().stream()
                 .mapToDouble(ModuleSummary::getSeconds)
                 .sum();
-        // To prevent floating-point errors, the minimum value should not be less than 0.
         double overhead = Math.max(0.0, totalBuild - totalModules);
 
         System.out.println("=== Build Analyzer CLI ===");
         System.out.println("Log file : " + logPath);
         System.out.println();
 
-        // clarify total time structure
         System.out.printf("Total build time   : %.3f s%n", totalBuild);
         System.out.printf("Modules total time : %.3f s (%.1f%% of build)%n",
                 totalModules, totalModules / totalBuild * 100.0);
@@ -90,8 +116,6 @@ public class BuildAnalyzerCli {
 
         System.out.println("Modules by time (share of whole build):");
 
-        // Print the list of modules in descending order of time taken,
-        // each module still listed as a percentage of the total build time.
         summary.getModules().stream()
                 .sorted(Comparator.comparingDouble(ModuleSummary::getSeconds).reversed())
                 .forEachOrdered(new Consumer<>() {
@@ -113,7 +137,6 @@ public class BuildAnalyzerCli {
 
         System.out.println();
 
-        // slowest module
         summary.getModules().stream()
                 .max(Comparator.comparingDouble(ModuleSummary::getSeconds))
                 .ifPresent(slowest -> {

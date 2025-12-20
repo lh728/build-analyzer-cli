@@ -6,7 +6,9 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -101,7 +103,7 @@ class BuildAnalyzerCliTest {
         return out.toString(StandardCharsets.UTF_8);
     }
 
-    // ---------------- existing success-path tests (kept) ----------------
+    // ---------------- existing success-path tests  ----------------
 
     @Test
     void main_shouldPrintHumanReadableSummary_inTextMode() {
@@ -132,8 +134,6 @@ class BuildAnalyzerCliTest {
         assertTrue(output.contains("\n"));
     }
 
-    // ---------------- additional coverage tests ----------------
-
     @Test
     void main_shouldPrintJsonSummary_whenJsonEnabledButNotPretty() {
         String[] args = {"-j", "sample-logs/build-parent.log"};
@@ -147,6 +147,8 @@ class BuildAnalyzerCliTest {
         assertFalse(output.contains("\n  \"")); // very typical pretty indent pattern
     }
 
+    // ---------------- error-path tests ----------------
+
     @Test
     void main_shouldExit2_whenLogFileNotFound() {
         RunResult r = runMainExpectExit(new String[]{"this-file-should-not-exist-12345.log"});
@@ -158,7 +160,6 @@ class BuildAnalyzerCliTest {
 
     @Test
     void main_shouldExit1_whenArgsInvalid_orMissingRequiredArgs() {
-        // Most CLIs throw IllegalStateException when args are empty/invalid.
         RunResult r = runMainExpectExit(new String[]{});
 
         assertEquals(1, r.exitCode());
@@ -180,5 +181,44 @@ class BuildAnalyzerCliTest {
 
         assertEquals(99, r.exitCode());
         assertTrue(r.err().contains("Unexpected error:"));
+    }
+
+    // ---------------- new tests: DIRECTORY / PATTERN aggregation ----------------
+
+    @Test
+    void main_shouldAggregateDirectory_inTextMode(@TempDir Path tempDir) throws Exception {
+        Path sample = Paths.get("sample-logs/build-parent.log");
+        assertTrue(Files.exists(sample), "sample-logs/build-parent.log should exist for this test");
+
+        Files.copy(sample, tempDir.resolve("build-1.log"));
+        Files.copy(sample, tempDir.resolve("build-2.log"));
+
+        String output = runMainCaptureStdout(new String[]{"--dir", tempDir.toString()});
+
+        assertTrue(output.contains("Build Analyzer CLI (aggregate: directory)"));
+        assertTrue(output.contains("Builds analyzed"));
+        assertTrue(output.contains("Modules by average time:"));
+        assertTrue(output.contains("Log files (2):"));
+    }
+
+    @Test
+    void main_shouldExit7_whenDirHasNoLogFiles(@TempDir Path tempDir) {
+        RunResult r = runMainExpectExit(new String[]{"--dir", tempDir.toString()});
+
+        assertEquals(7, r.exitCode());
+        assertTrue(r.err().contains("No .log files found in directory"));
+    }
+
+    @Test
+    void main_shouldAggregatePattern_inJsonPretty() {
+        String[] args = {"-jp", "--aggregate", "sample-logs/build-*.log"};
+
+        String output = runMainCaptureStdout(args).trim();
+
+        assertTrue(output.startsWith("{"));
+        assertTrue(output.contains("\"mode\""));
+        assertTrue(output.contains("\"logFiles\""));
+        assertTrue(output.contains("\"summary\""));
+        assertTrue(output.contains("\"buildCount\""));
     }
 }

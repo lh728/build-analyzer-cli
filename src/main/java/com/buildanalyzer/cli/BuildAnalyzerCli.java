@@ -311,5 +311,140 @@ public class BuildAnalyzerCli {
                     System.out.printf("Slowest module: %s (%.3f s, %.1f%% of build)%n",
                             slowest.getName(), slowest.getSeconds(), percentOfBuild);
                 });
+
+        // ---------- NEW: Test breakdown per module ----------
+
+        System.out.println();
+        System.out.println("Test breakdown per module:");
+
+        for (ModuleSummary m : summary.getModules()) {
+            if (m.getTestsRun() == 0 && m.getTestTimeSeconds() <= 0.0) {
+                System.out.printf("  %s: no tests detected%n", m.getName());
+            } else {
+                double pctOfModule = m.getSeconds() > 0.0
+                        ? (m.getTestTimeSeconds() / m.getSeconds()) * 100.0
+                        : 0.0;
+                System.out.printf(
+                        "  %s: tests %d (F:%d, E:%d, S:%d) in %.3f s (%.1f%% of module time)%n",
+                        m.getName(),
+                        m.getTestsRun(),
+                        m.getFailures(),
+                        m.getErrors(),
+                        m.getSkipped(),
+                        m.getTestTimeSeconds(),
+                        pctOfModule
+                );
+            }
+        }
+
+        // ---------- NEW: Compilation workload ----------
+
+        System.out.println();
+        System.out.println("Compilation workload (source files):");
+
+        for (ModuleSummary m : summary.getModules()) {
+            System.out.printf(
+                    "  %s: main %d, test %d%n",
+                    m.getName(),
+                    m.getMainSourceFiles(),
+                    m.getTestSourceFiles()
+            );
+        }
+
+        // ---------- NEW: Module pipeline (plugin goals) ----------
+
+
+        System.out.println();
+        System.out.println("Module pipeline (Maven build steps, in execution order):");
+        System.out.println("  (Each step is a Maven plugin goal; the arrow shows a short explanation.)");
+
+        for (ModuleSummary m : summary.getModules()) {
+            System.out.printf("  %s:%n", m.getName());
+            if (m.getPipelineSteps().isEmpty()) {
+                System.out.println("    (no plugin steps detected)");
+            } else {
+                for (String step : m.getPipelineSteps()) {
+                    System.out.printf("    - %-30s -> %s%n", step, describePipelineStep(step));
+                }
+            }
+        }
+
     }
+
+    /**
+     * Give a human-readable explanation for a Maven plugin step string like
+     * "compiler:3.13.0:compile" or "surefire:3.3.0:test".
+     */
+    private static String describePipelineStep(String step) {
+        int firstColon = step.indexOf(':');
+        int lastColon = step.lastIndexOf(':');
+
+        if (firstColon < 0 || lastColon < 0 || firstColon == lastColon) {
+            return "Run Maven plugin goal (" + step + ")";
+        }
+
+        String plugin = step.substring(0, firstColon);
+        String goal = step.substring(lastColon + 1);
+
+        switch (plugin) {
+            case "clean" -> {
+                return "Clean project (delete previous build output)";
+            }
+            case "resources" -> {
+                if ("resources".equals(goal)) {
+                    return "Process main resources (copy/filter src/main/resources)";
+                } else if ("testResources".equals(goal)) {
+                    return "Process test resources (copy/filter src/test/resources)";
+                } else {
+                    return "Process resources (" + goal + ")";
+                }
+            }
+            case "compiler" -> {
+                if ("compile".equals(goal)) {
+                    return "Compile main Java sources (src/main/java)";
+                } else if ("testCompile".equals(goal)) {
+                    return "Compile test Java sources (src/test/java)";
+                } else {
+                    return "Compile sources (" + goal + ")";
+                }
+            }
+            case "surefire" -> {
+                if ("test".equals(goal)) {
+                    return "Run unit tests (Surefire)";
+                } else {
+                    return "Run tests via Surefire (" + goal + ")";
+                }
+            }
+            case "failsafe" -> {
+                if ("integration-test".equals(goal)) {
+                    return "Run integration tests (Failsafe)";
+                } else if ("verify".equals(goal)) {
+                    return "Verify integration test results (Failsafe)";
+                } else {
+                    return "Run Failsafe goal (" + goal + ")";
+                }
+            }
+            case "jar" -> {
+                if ("jar".equals(goal)) {
+                    return "Package module into JAR";
+                } else {
+                    return "JAR packaging step (" + goal + ")";
+                }
+            }
+            case "war" -> {
+                return "Package module into WAR";
+            }
+            case "install" -> {
+                return "Install artifacts into local Maven repository";
+            }
+            case "deploy" -> {
+                return "Deploy artifacts to remote Maven repository";
+            }
+            default -> {
+                return "Run Maven plugin '" + plugin + "' goal '" + goal + "'";
+            }
+        }
+    }
+
+
 }

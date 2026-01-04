@@ -21,5 +21,9 @@ public enum Mode {
      * Analyze all log files matching a glob pattern
      * (e.g. --aggregate ci-logs/build-*.log).
      */
-    PATTERN
+    PATTERN,
+    /**
+     * run 'mvn clean install' then analyze captured log
+     */
+    CLEAN_INSTALL
 }

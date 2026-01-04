@@ -1,9 +1,6 @@
 package com.buildanalyzer.cli;
 
-import com.buildanalyzer.command.CliCommand;
-import com.buildanalyzer.command.DirectoryAggregateCommand;
-import com.buildanalyzer.command.PatternAggregateCommand;
-import com.buildanalyzer.command.SingleLogCommand;
+import com.buildanalyzer.command.*;
 
 import java.io.IOException;
 import java.util.EnumMap;
@@ -27,6 +24,7 @@ public class BuildAnalyzerCli {
         COMMANDS.put(Mode.SINGLE_LOG, new SingleLogCommand());
         COMMANDS.put(Mode.DIRECTORY, new DirectoryAggregateCommand());
         COMMANDS.put(Mode.PATTERN, new PatternAggregateCommand());
+        COMMANDS.put(Mode.CLEAN_INSTALL, new CleanInstallCommand());
     }
 
     public static void main(String[] args) {

@@ -18,7 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * CLI command: run 'mvn clean install' and analyze the captured log.
+ * CLI command: run 'mvn clean install' (or Maven Wrapper) and analyze the captured log.
  */
 public class CleanInstallCommand implements CliCommand {
 
@@ -44,20 +44,16 @@ public class CleanInstallCommand implements CliCommand {
             System.exit(2);
         }
 
-        // 2) 准备 log 文件位置：target/build-analyzer/clean-install-YYYYMMDD-HHmmss.log
-        Path logDir = projectDir.resolve("target").resolve("build-analyzer");
+        // 2) 准备 log 文件位置：<project>/.build-analyzer/logs/clean-install-YYYYMMDD-HHmmss.log
+        Path logDir = projectDir.resolve(".build-analyzer").resolve("logs");
         Files.createDirectories(logDir);
 
         String timestamp = LocalDateTime.now()
                 .format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
         Path logFile = logDir.resolve("clean-install-" + timestamp + ".log");
 
-        // 3) 构造 mvn 命令
-        List<String> cmd = new ArrayList<>();
-        cmd.add("mvn");
-        cmd.add("clean");
-        cmd.add("install");
-        cmd.addAll(options.extraMavenArgs());
+        // 3) 构造 Maven 命令（优先使用 mvnw / mvnw.cmd）
+        List<String> cmd = buildMavenCommand(projectDir, options.extraMavenArgs());
 
         ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.directory(projectDir.toFile());
@@ -87,7 +83,7 @@ public class CleanInstallCommand implements CliCommand {
 
         if (exitCode != 0) {
             System.err.println();
-            System.err.println("ERROR: 'mvn clean install' failed with exit code " + exitCode + ".");
+            System.err.println("ERROR: Maven build failed with exit code " + exitCode + ".");
             System.err.println("       Log captured at: " + logFile.toAbsolutePath());
             System.exit(exitCode);
         }
@@ -106,5 +102,31 @@ public class CleanInstallCommand implements CliCommand {
             textPrinter.print(logFile, summary);
         }
     }
-}
 
+    /**
+     * 构造 Maven 命令:
+     * 1) 如果项目根有 Maven Wrapper，优先用 mvnw/mvnw.cmd
+     * 2) 否则 Windows 用 mvn.cmd，其他系统用 mvn
+     */
+    private List<String> buildMavenCommand(Path projectDir, List<String> extraArgs) throws Exception {
+        boolean isWindows = System.getProperty("os.name").toLowerCase().contains("win");
+
+        // 先尝试 Maven Wrapper
+        Path mvnw = projectDir.resolve(isWindows ? "mvnw.cmd" : "mvnw");
+        List<String> cmd = new ArrayList<>();
+
+        if (Files.exists(mvnw) && Files.isRegularFile(mvnw)) {
+            // 直接用 wrapper（绝对路径，避免 PATH 问题）
+            cmd.add(mvnw.toAbsolutePath().toString());
+        } else {
+            // wrapper 不存在，回退到系统 Maven
+            cmd.add(isWindows ? "mvn.cmd" : "mvn");
+        }
+
+        cmd.add("clean");
+        cmd.add("install");
+        cmd.addAll(extraArgs);
+
+        return cmd;
+    }
+}

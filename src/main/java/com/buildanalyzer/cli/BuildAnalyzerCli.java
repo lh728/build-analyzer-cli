@@ -35,8 +35,7 @@ public class BuildAnalyzerCli {
             System.err.println("ERROR: " + e.getMessage());
             System.exit(3);
         } catch (IOException e) {
-            // IO
-            System.err.println("ERROR: Failed to read log file: " + e.getMessage());
+            System.err.println("ERROR: I/O error: " + e.getMessage());
             System.exit(4);
         } catch (Exception e) {
             // unexpected exception

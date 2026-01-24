@@ -2,14 +2,9 @@ package com.buildanalyzer.output;
 
 import com.buildanalyzer.core.model.BuildSummary;
 import com.buildanalyzer.core.model.ModuleSummary;
-import com.buildanalyzer.core.plugin.PluginTiming;
-import com.buildanalyzer.core.plugin.PluginTimingAnalyzer;
 
-import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
 import java.util.function.Consumer;
 
 /**
@@ -103,54 +98,7 @@ public class SingleBuildTextPrinter {
                     m.getTestSourceFiles()
             );
         }
-
-        // --- Plugin workload ---
-        printPluginBreakdown(logPath, summary);
-
     }
-
-    private void printPluginBreakdown(Path logPath, BuildSummary summary) {
-        PluginTimingAnalyzer analyzer = new PluginTimingAnalyzer();
-        Map<String, List<PluginTiming>> perModule;
-        try {
-            perModule = analyzer.analyze(logPath, summary);
-        } catch (IOException e) {
-            System.out.println();
-            System.out.println("Plugin breakdown per module (skipped: failed to read log file: "
-                    + e.getMessage() + ")");
-            return;
-        }
-
-        System.out.println();
-        System.out.println("Plugin breakdown per module (estimated from log size):");
-
-        for (ModuleSummary m : summary.getModules()) {
-            List<PluginTiming> timings = perModule.get(m.getName());
-            System.out.printf("  %s:%n", m.getName());
-
-            if (timings == null || timings.isEmpty()) {
-                System.out.println("    (no plugin steps detected)");
-                continue;
-            }
-
-            double moduleSeconds = m.getSeconds();
-
-            for (PluginTiming t : timings) {
-                double pctOfModule = moduleSeconds > 0.0
-                        ? (t.estimatedSeconds() / moduleSeconds) * 100.0
-                        : 0.0;
-
-                System.out.printf(
-                        "    - %-18s ~%6.3f s  (%4.1f%% of module, %3d lines)%n",
-                        t.pluginKey(),           // e.g. compiler:compile
-                        t.estimatedSeconds(),    // 估算时间
-                        pctOfModule,             // 占模块百分比
-                        t.lineCount()            // 日志行数
-                );
-            }
-        }
-    }
-
 
 }
 

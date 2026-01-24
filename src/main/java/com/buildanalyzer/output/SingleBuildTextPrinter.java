@@ -1,5 +1,7 @@
 package com.buildanalyzer.output;
 
+import com.buildanalyzer.core.health.BuildHealthEvaluator;
+import com.buildanalyzer.core.health.BuildHealthHint;
 import com.buildanalyzer.core.model.BuildSummary;
 import com.buildanalyzer.core.model.ModuleSummary;
 
@@ -98,7 +100,42 @@ public class SingleBuildTextPrinter {
                     m.getTestSourceFiles()
             );
         }
+
+        // --- Health hints ---
+        printHealthHints(summary);
+
     }
+
+    private void printHealthHints(BuildSummary summary) {
+        BuildHealthEvaluator evaluator = new BuildHealthEvaluator();
+        var hints = evaluator.evaluate(summary);
+
+        System.out.println();
+        System.out.println("Build health hints:");
+
+        if (hints.isEmpty()) {
+            System.out.println("  (no issues detected by current rules)");
+            return;
+        }
+
+        for (BuildHealthHint hint : hints) {
+            String label = switch (hint.severity()) {
+                case CRITICAL -> "[CRITICAL]";
+                case WARN -> "[WARN]";
+                case INFO -> "[INFO]";
+            };
+
+            String scope = hint.scope();
+            if (scope != null && !scope.isBlank() && !"build".equals(scope)) {
+                // module 作用域
+                System.out.printf("  %s [%s] %s%n", label, scope, hint.message());
+            } else {
+                // 整体构建
+                System.out.printf("  %s %s%n", label, hint.message());
+            }
+        }
+    }
+
 
 }
 

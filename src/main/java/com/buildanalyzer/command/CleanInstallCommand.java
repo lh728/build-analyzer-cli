@@ -44,6 +44,13 @@ public class CleanInstallCommand implements CliCommand {
             System.exit(2);
         }
 
+        if (containsThreadsFlag(options.extraMavenArgs())) {
+            System.err.println("ERROR: --clean-install does not support parallel builds (-T/--threads).");
+            System.err.println("       Reason: log lines are interleaved, making per-module metrics unreliable.");
+            System.err.println("       Fix: remove -T, or run Maven yourself and analyze the log in SINGLE_LOG mode.");
+            System.exit(2);
+        }
+
         // 2) 准备 log 文件位置：<project>/.build-analyzer/logs/clean-install-YYYYMMDD-HHmmss.log
         Path logDir = projectDir.resolve(".build-analyzer").resolve("logs");
         Files.createDirectories(logDir);
@@ -129,4 +136,15 @@ public class CleanInstallCommand implements CliCommand {
 
         return cmd;
     }
+
+    private static boolean containsThreadsFlag(List<String> extraArgs) {
+        for (String a : extraArgs) {
+            if (a == null) continue;
+            // -T1C, -T 1C, -T4, etc.
+            if (a.equals("-T") || a.startsWith("-T")) return true;
+            if (a.equals("--threads") || a.startsWith("--threads=")) return true; // 兼容可能的长选项
+        }
+        return false;
+    }
+
 }

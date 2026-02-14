@@ -8,6 +8,7 @@ import com.buildanalyzer.output.SingleBuildTextPrinter;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -19,6 +20,10 @@ import java.util.List;
 
 /**
  * CLI command: run 'mvn clean install' (or Maven Wrapper) and analyze the captured log.
+ *
+ * NOTE:
+ *   For reliability, --clean-install does NOT allow parallel build (-T/--threads),
+ *   because interleaved logs break per-module attribution.
  */
 public class CleanInstallCommand implements CliCommand {
 
@@ -28,7 +33,10 @@ public class CleanInstallCommand implements CliCommand {
 
     @Override
     public void execute(CliOptions options) throws Exception {
-        // 1) 确定工程目录（默认当前）
+        // 0) Reject -T/--threads in clean-install mode (user-provided extra args)
+        ensureNoParallelArgs(options.extraMavenArgs());
+
+        // 1) project dir (default ".")
         Path projectDir = options.projectDir() != null
                 ? Paths.get(options.projectDir())
                 : Paths.get(".");
@@ -44,14 +52,7 @@ public class CleanInstallCommand implements CliCommand {
             System.exit(2);
         }
 
-        if (containsThreadsFlag(options.extraMavenArgs())) {
-            System.err.println("ERROR: --clean-install does not support parallel builds (-T/--threads).");
-            System.err.println("       Reason: log lines are interleaved, making per-module metrics unreliable.");
-            System.err.println("       Fix: remove -T, or run Maven yourself and analyze the log in SINGLE_LOG mode.");
-            System.exit(2);
-        }
-
-        // 2) 准备 log 文件位置：<project>/.build-analyzer/logs/clean-install-YYYYMMDD-HHmmss.log
+        // 2) log file location: <project>/.build-analyzer/logs/clean-install-YYYYMMDD-HHmmss.log
         Path logDir = projectDir.resolve(".build-analyzer").resolve("logs");
         Files.createDirectories(logDir);
 
@@ -59,12 +60,12 @@ public class CleanInstallCommand implements CliCommand {
                 .format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
         Path logFile = logDir.resolve("clean-install-" + timestamp + ".log");
 
-        // 3) 构造 Maven 命令（优先使用 mvnw / mvnw.cmd）
+        // 3) build Maven command (prefer mvnw)
         List<String> cmd = buildMavenCommand(projectDir, options.extraMavenArgs());
 
         ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.directory(projectDir.toFile());
-        pb.redirectErrorStream(true); // stderr 合并到 stdout
+        pb.redirectErrorStream(true); // merge stderr into stdout
 
         System.out.println("Running: " + String.join(" ", cmd));
         System.out.println("Working directory: " + projectDir.toAbsolutePath());
@@ -73,9 +74,8 @@ public class CleanInstallCommand implements CliCommand {
 
         Process process = pb.start();
 
-        // 4) tee：一边打印到控制台，一边写入 logFile
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(process.getInputStream()));
+        // 4) tee: console + logFile
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
              BufferedWriter writer = Files.newBufferedWriter(logFile)) {
 
             String line;
@@ -95,7 +95,17 @@ public class CleanInstallCommand implements CliCommand {
             System.exit(exitCode);
         }
 
-        // 5) 构建成功后，用现有 parser + printer 分析刚刚的 log
+        // 4.5) Safety: reject parallel build detected from captured log
+        if (logIndicatesParallelBuild(logFile)) {
+            System.err.println();
+            System.err.println("ERROR: Parallel build detected in captured log (MultiThreadedBuilder / -T).");
+            System.err.println("       --clean-install requires a single-thread build for reliable analysis.");
+            System.err.println("       Fix: remove -T/--threads from your Maven args AND check .mvn/maven.config.");
+            System.err.println("       Log: " + logFile.toAbsolutePath());
+            System.exit(2);
+        }
+
+        // 5) parse + output
         System.out.println();
         System.out.println("=== Analyzing captured build log ===");
         System.out.println("Log file : " + logFile.toAbsolutePath());
@@ -111,22 +121,19 @@ public class CleanInstallCommand implements CliCommand {
     }
 
     /**
-     * 构造 Maven 命令:
-     * 1) 如果项目根有 Maven Wrapper，优先用 mvnw/mvnw.cmd
-     * 2) 否则 Windows 用 mvn.cmd，其他系统用 mvn
+     * Build Maven command:
+     * 1) Prefer Maven Wrapper (mvnw/mvnw.cmd)
+     * 2) Else use mvn/mvn.cmd
      */
-    private List<String> buildMavenCommand(Path projectDir, List<String> extraArgs) throws Exception {
+    private List<String> buildMavenCommand(Path projectDir, List<String> extraArgs) {
         boolean isWindows = System.getProperty("os.name").toLowerCase().contains("win");
 
-        // 先尝试 Maven Wrapper
         Path mvnw = projectDir.resolve(isWindows ? "mvnw.cmd" : "mvnw");
         List<String> cmd = new ArrayList<>();
 
         if (Files.exists(mvnw) && Files.isRegularFile(mvnw)) {
-            // 直接用 wrapper（绝对路径，避免 PATH 问题）
             cmd.add(mvnw.toAbsolutePath().toString());
         } else {
-            // wrapper 不存在，回退到系统 Maven
             cmd.add(isWindows ? "mvn.cmd" : "mvn");
         }
 
@@ -137,14 +144,36 @@ public class CleanInstallCommand implements CliCommand {
         return cmd;
     }
 
-    private static boolean containsThreadsFlag(List<String> extraArgs) {
-        for (String a : extraArgs) {
+    private static void ensureNoParallelArgs(List<String> extraArgs) {
+        if (extraArgs == null || extraArgs.isEmpty()) return;
+
+        for (int i = 0; i < extraArgs.size(); i++) {
+            String a = extraArgs.get(i);
             if (a == null) continue;
-            // -T1C, -T 1C, -T4, etc.
-            if (a.equals("-T") || a.startsWith("-T")) return true;
-            if (a.equals("--threads") || a.startsWith("--threads=")) return true; // 兼容可能的长选项
+
+            // -T1C  / -T4 / -T etc
+            if (a.equals("-T") || a.startsWith("-T")) {
+                System.err.println("ERROR: --clean-install does not support parallel Maven builds (-T).");
+                System.err.println("       Remove '-T...' and run again. If you need parallel builds, run Maven");
+                System.err.println("       yourself and analyze the produced log file with single-log mode.");
+                System.exit(2);
+            }
+
+            // --threads or --threads=1C
+            if (a.equals("--threads") || a.startsWith("--threads=")) {
+                System.err.println("ERROR: --clean-install does not support parallel Maven builds (--threads).");
+                System.err.println("       Remove '--threads...' and run again.");
+                System.exit(2);
+            }
         }
-        return false;
     }
 
+    private static boolean logIndicatesParallelBuild(Path logFile) {
+        try (var lines = Files.lines(logFile)) {
+            return lines.anyMatch(l -> l != null && l.contains("MultiThreadedBuilder"));
+        } catch (IOException e) {
+            // best-effort: if we can't read the log, don't block
+            return false;
+        }
+    }
 }
